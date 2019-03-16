@@ -1,0 +1,54 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: chatboxx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: app
+  template:
+    metadata:
+      labels:
+        role: app
+    spec:
+      containers:
+        - name: app
+          image: alexandreroman/chatboxx
+          imagePullPolicy: Always
+          env:
+            # Set where to find a ConfigMap for this pod (namespace and name).
+            - name: SPRING_CLOUD_KUBERNETES_CONFIG_NAMESPACE
+              value: "chatboxx"
+            - name: SPRING_CLOUD_KUBERNETES_CONFIG_NAME
+              value: "app"
+
+            # You need to enable this actuator endpoint to support ConfigMap reloading.
+            - name: MANAGEMENT_ENDPOINT_RESTART_ENABLED
+              value: "true"
+            # Enable ConfigMap reloading (disabled by default).
+            - name: SPRING_CLOUD_KUBERNETES_RELOAD_ENABLED
+              value: "true"
+            - name: SPRING_CLOUD_KUBERNETES_RELOAD_STRATEGY
+              value: "shutdown" # choose between refresh, restart_context or shutdown
+          volumeMounts:
+            - name: gcp-volume
+              mountPath: /gcp
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              port: 8080
+              path: /actuator/health
+            initialDelaySeconds: 60
+          readinessProbe:
+            httpGet:
+              port: 8080
+              path: /actuator/health
+            initialDelaySeconds: 15
+      volumes:
+        - name: gcp-volume
+          configMap:
+            name: gcp-config

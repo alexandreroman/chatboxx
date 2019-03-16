@@ -1,0 +1,17 @@
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+spring:
+  cloud:
+    stream:
+      bindings:
+        output:
+          destination: chatboxx-messages
+        input:
+          destination: chatboxx-messages
+
+server:
+  port: ${PORT:8080}
