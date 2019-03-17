@@ -25,7 +25,7 @@ spec:
             - name: SPRING_CLOUD_KUBERNETES_CONFIG_NAME
               value: "app"
 
-            # You need to enable this actuator endpoint to support ConfigMap reloading.
+            # Enable this actuator endpoint to support ConfigMap reloading.
             - name: MANAGEMENT_ENDPOINT_RESTART_ENABLED
               value: "true"
             # Enable ConfigMap reloading (disabled by default).
@@ -34,8 +34,10 @@ spec:
             - name: SPRING_CLOUD_KUBERNETES_RELOAD_STRATEGY
               value: "shutdown" # choose between refresh, restart_context or shutdown
           volumeMounts:
-            - name: gcp-volume
+            # Mount GCP credentials as a volume: see chatboxx-02-config.yml for details.
+            - name: gcp-credentials
               mountPath: /gcp
+              readOnly: true
           ports:
             - containerPort: 8080
           livenessProbe:
@@ -49,6 +51,6 @@ spec:
               path: /actuator/health
             initialDelaySeconds: 15
       volumes:
-        - name: gcp-volume
-          configMap:
-            name: gcp-config
+        - name: gcp-credentials
+          secret:
+            secretName: gcp-credentials
