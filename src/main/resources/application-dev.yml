@@ -1,3 +1,9 @@
+security:
+  oauth2:
+    client:
+      clientId: 237a25e848fdc6518643
+      clientSecret: 053e78c63be4fec00ea2df9ea9c663805abfea9d
+
 logging:
   level:
     fr.alexandreroman.chatboxx: DEBUG

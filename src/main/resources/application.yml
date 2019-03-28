@@ -12,6 +12,20 @@ spring:
           destination: chatboxx-messages
         input:
           destination: chatboxx-messages
+  mvc:
+    favicon:
+      enabled: false
+
+security:
+  oauth2:
+    client:
+      clientId: fbd25a3941cb7f7d4a40
+      clientSecret: aa93dff4b3bb3c1eed0d1dcba751d1458e1c1909
+      accessTokenUri: https://github.com/login/oauth/access_token
+      userAuthorizationUri: https://github.com/login/oauth/authorize
+      clientAuthenticationScheme: form
+    resource:
+      userInfoUri: https://api.github.com/user
 
 server:
   port: ${PORT:8080}
