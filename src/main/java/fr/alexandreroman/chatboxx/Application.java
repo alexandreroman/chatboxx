@@ -45,7 +45,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotEmpty;
 import java.io.IOException;
 import java.net.URL;
@@ -116,23 +115,19 @@ class Message {
 }
 
 @Controller
+@RequiredArgsConstructor
 class LoginController {
     @GetMapping("/login")
-    String login() {
+    ResponseEntity<?> login(UriComponentsBuilder ucb) {
         // User login is managed by Spring Security:
         // here we just redirect the request to the home page
         // AFTER a successful user authentication.
-        return "/";
-    }
-
-    @GetMapping("/logout")
-    ResponseEntity<?> logout(HttpServletRequest req, UriComponentsBuilder ucb) {
-        // Invalidate user session.
-        req.getSession().invalidate();
 
         return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
                 .location(ucb.path("/").build().toUri()).build();
     }
+
+    // TODO add logout
 }
 
 @RestController
