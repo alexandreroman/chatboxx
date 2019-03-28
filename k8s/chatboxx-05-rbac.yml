@@ -6,7 +6,7 @@ metadata:
   namespace: chatboxx
 rules:
 - apiGroups: [""] # "" indicates the core API group
-  resources: ["services", "pods", "configmaps", "endpoints"]
+  resources: ["pods", "configmaps"]
   verbs: ["get", "watch", "list"]
 ---
 kind: RoleBinding
