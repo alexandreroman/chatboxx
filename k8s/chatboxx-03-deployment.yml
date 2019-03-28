@@ -5,7 +5,7 @@ metadata:
   name: app
   namespace: chatboxx
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       role: app
@@ -14,6 +14,17 @@ spec:
       labels:
         role: app
     spec:
+      affinity:
+        # Use pod anti-affinity to force app deployment on different nodes.
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: role
+                    operator: In
+                    values:
+                      - app
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: app
           image: alexandreroman/chatboxx
