@@ -22,37 +22,26 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.cloud.stream.messaging.Sink;
 import org.springframework.cloud.stream.messaging.Source;
-import org.springframework.context.annotation.*;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotEmpty;
-import java.io.IOException;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+@EnableConfigurationProperties
 @SpringBootApplication
 public class Application {
     public static void main(String[] args) {
@@ -71,7 +60,7 @@ class MessagesController {
     private final UserIdentity user;
 
     @StreamListener(Sink.INPUT)
-    void onNewMessage(Message msg) throws IOException {
+    void onNewMessage(Message msg) {
         // Listen to the topic where messages are sent to
         // by an app instance when an user posts something.
         log.debug("Received new message: {}", msg);
@@ -134,72 +123,5 @@ class Message {
         return new Message(
                 UUID.randomUUID(),
                 msg, ZonedDateTime.now(), author, avatar);
-    }
-}
-
-@Controller
-@RequiredArgsConstructor
-class LoginController {
-    @GetMapping("/login")
-    ResponseEntity<?> login(UriComponentsBuilder ucb) {
-        return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
-                .location(ucb.path("/oauth2/authorization/github").build().toUri()).build();
-    }
-}
-
-@RestController
-@RequiredArgsConstructor
-class IdentityController {
-    private final UserIdentity user;
-
-    @GetMapping("/api/me")
-    @PreAuthorize("isAuthenticated()")
-    ResponseEntity<?> me() {
-        final Map<String, String> result = new HashMap<>(2);
-        result.put("user", user.getUser());
-        result.put("avatar", user.getAvatar());
-        return ResponseEntity.ok(result);
-    }
-}
-
-@Data
-class UserIdentity {
-    private final String user;
-    private final String avatar;
-}
-
-@EnableWebSecurity
-@EnableGlobalMethodSecurity(prePostEnabled = true, proxyTargetClass = true)
-@Configuration
-class SecurityConfig extends WebSecurityConfigurerAdapter {
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.csrf().disable().httpBasic().disable().formLogin().disable()
-                .exceptionHandling().accessDeniedHandler((req, resp, e) -> resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Access denied"))
-                .and().anonymous()
-                .and().antMatcher("/**")
-                .authorizeRequests()
-                .antMatchers("/actuator**", "/error**", "/login**", "/login/oauth2/**", "/logout",
-                        "/", "**.js", "**.css", "**.png", "**.ico").permitAll()
-                .and().oauth2Login().loginPage("/login")
-                .and().logout().logoutSuccessUrl("/").permitAll();
-    }
-
-    @Bean
-    @Profile("!noauth")
-    @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
-    UserIdentity identityProvider() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        final OAuth2AuthenticationToken oauth2 = (OAuth2AuthenticationToken) auth;
-        final OAuth2User user = oauth2.getPrincipal();
-        return new UserIdentity((String) user.getAttributes().get("login"),
-                (String) user.getAttributes().get("avatar_url"));
-    }
-
-    @Bean
-    @Profile("noauth")
-    UserIdentity dummyIdentityProvider() {
-        // Return a default user identity.
-        return new UserIdentity("johndoe", null);
     }
 }
