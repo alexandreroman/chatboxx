@@ -28,6 +28,7 @@ import org.springframework.cloud.stream.messaging.Sink;
 import org.springframework.cloud.stream.messaging.Source;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -46,9 +47,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 import javax.validation.constraints.NotEmpty;
 import java.io.IOException;
 import java.time.ZonedDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @SpringBootApplication
 public class Application {
@@ -58,12 +58,12 @@ public class Application {
 }
 
 @RestController
-@RequestMapping(path = "/api")
+@RequestMapping
 @EnableBinding({Sink.class, Source.class})
 @RequiredArgsConstructor
 @Slf4j
 class MessagesController {
-    private final SseEmitter sseEmitter = new SseEmitter(0L);
+    private final CopyOnWriteArrayList<SseEmitter> emitters = new CopyOnWriteArrayList<>();
     private final Source messageSource;
     private final UserIdentity user;
 
@@ -72,16 +72,37 @@ class MessagesController {
         // Listen to the topic where messages are sent to
         // by an app instance when an user posts something.
         log.debug("Received new message: {}", msg);
-        sseEmitter.send(msg);
+
+        List<SseEmitter> deadEmitters = null;
+        for (final SseEmitter emitter : emitters) {
+            try {
+                log.trace("Sending message to client: {}", msg);
+                emitter.send(msg, MediaType.APPLICATION_JSON);
+            } catch (Exception e) {
+                if (deadEmitters == null) {
+                    deadEmitters = new ArrayList<>(1);
+                }
+                deadEmitters.add(emitter);
+            }
+        }
+        if (deadEmitters != null) {
+            emitters.removeAll(deadEmitters);
+        }
     }
 
-    @GetMapping("/messages/sse")
+    @GetMapping(value = "/api/messages/sse")
     SseEmitter getMessageEvents() {
         // Get message stream using a HTML5 Server-Sent-Event endpoint.
-        return sseEmitter;
+
+        final SseEmitter emitter = new SseEmitter();
+        emitters.add(emitter);
+        emitter.onCompletion(() -> emitters.remove(emitter));
+        emitter.onTimeout(() -> emitters.remove(emitter));
+
+        return emitter;
     }
 
-    @PostMapping("/messages")
+    @PostMapping("/api/messages")
     ResponseEntity<?> newMessage(@RequestParam("message") @NotEmpty String newMsg) {
         final String author = user.getUser();
         final String avatar = user.getAvatar();
@@ -163,7 +184,7 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatcher("/**")
                 .authorizeRequests()
                 .antMatchers("/actuator**", "/error**", "/login**", "/login/oauth2/**", "/logout",
-                        "/api/me", "/", "**.js", "**.css", "**.png", "**.ico").permitAll()
+                        "/api/me", "/api/messages/sse", "/", "**.js", "**.css", "**.png", "**.ico").permitAll()
                 .anyRequest().authenticated()
                 .and().oauth2Login().loginPage("/login")
                 .and().logout().logoutSuccessUrl("/").permitAll();
