@@ -22,33 +22,31 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.security.oauth2.client.EnableOAuth2Sso;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.cloud.stream.messaging.Sink;
 import org.springframework.cloud.stream.messaging.Source;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.validation.constraints.NotEmpty;
 import java.io.IOException;
-import java.net.URL;
 import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -67,6 +65,7 @@ public class Application {
 class MessagesController {
     private final SseEmitter sseEmitter = new SseEmitter(0L);
     private final Source messageSource;
+    private final UserIdentity user;
 
     @StreamListener(Sink.INPUT)
     void onNewMessage(Message msg) throws IOException {
@@ -84,9 +83,8 @@ class MessagesController {
 
     @PostMapping("/messages")
     ResponseEntity<?> newMessage(@RequestParam("message") @NotEmpty String newMsg) {
-        // TODO get user identity
-        final String author = "Someone";
-        final URL avatar = null;
+        final String author = user.getUser();
+        final String avatar = user.getAvatar();
         final Message msg = Message.from(newMsg, author, avatar);
 
         // Publish this message to all app instances.
@@ -105,9 +103,9 @@ class Message {
     private final String message;
     private final ZonedDateTime timeCreated;
     private final String author;
-    private final URL avatar;
+    private final String avatar;
 
-    static Message from(String msg, String author, URL avatar) {
+    static Message from(String msg, String author, String avatar) {
         return new Message(
                 UUID.randomUUID(),
                 msg, ZonedDateTime.now(), author, avatar);
@@ -119,93 +117,77 @@ class Message {
 class LoginController {
     @GetMapping("/login")
     ResponseEntity<?> login(UriComponentsBuilder ucb) {
-        // User login is managed by Spring Security:
-        // here we just redirect the request to the home page
-        // AFTER a successful user authentication.
-
         return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
-                .location(ucb.path("/").build().toUri()).build();
+                .location(ucb.path("/oauth2/authorization/github").build().toUri()).build();
     }
-
-    // TODO add logout
 }
 
 @RestController
 @RequiredArgsConstructor
 class IdentityController {
-    private final IdentityProvider identityProvider;
+    private final UserIdentity user;
 
     @GetMapping("/api/me")
     ResponseEntity<?> me() {
-        final Identity id = identityProvider.getIdentity();
-        if (id == null) {
+        if (user.isAnonymous()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You're not authenticated");
         }
-        return ResponseEntity.ok(id);
+        final Map<String, String> result = new HashMap<>(2);
+        result.put("user", user.getUser());
+        result.put("avatar", user.getAvatar());
+        return ResponseEntity.ok(result);
     }
 }
 
 @Data
-@JsonInclude(JsonInclude.Include.NON_EMPTY)
-class Identity {
+class UserIdentity {
+    private static final UserIdentity ANONYMOUS = new UserIdentity("_anonymous_", null);
     private final String user;
-    @Nullable
     private final String avatar;
+
+    public static UserIdentity anonymous() {
+        return ANONYMOUS;
+    }
+
+    boolean isAnonymous() {
+        return this.equals(ANONYMOUS);
+    }
 }
 
-/**
- * User identity provider.
- */
-interface IdentityProvider {
-    /**
-     * Get current authenticated user identity, if any.
-     *
-     * @return user identity, <code>null</code> if there is no authenticated user
-     */
-    @Nullable
-    Identity getIdentity();
-}
-
-@EnableOAuth2Sso
+@EnableWebSecurity
 @Configuration
 class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        http.antMatcher("/**")
+        http.csrf().disable().httpBasic().disable().formLogin().disable()
+                .antMatcher("/**")
                 .authorizeRequests()
-                .antMatchers("/actuator**", "/logout", "/error**", "/api/me", "/", "/index.html", "**.js", "**.css", "**.png", "**.ico").permitAll()
-                .anyRequest().authenticated();
+                .antMatchers("/actuator**", "/error**", "/login**", "/login/oauth2/**", "/logout",
+                        "/api/me", "/", "**.js", "**.css", "**.png", "**.ico").permitAll()
+                .anyRequest().authenticated()
+                .and().oauth2Login().loginPage("/login")
+                .and().logout().logoutSuccessUrl("/").permitAll();
     }
 
     @Bean
     @Profile("!noauth")
-    IdentityProvider identityProvider() {
-        return () -> {
-            final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth == null || !(auth instanceof OAuth2Authentication)) {
-                return null;
-            }
+    @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
+    UserIdentity identityProvider() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!(auth instanceof OAuth2AuthenticationToken)) {
+            return UserIdentity.anonymous();
+        }
 
-            // Use Spring Security OAuth2 support to get user identity.
-            final OAuth2Authentication oauth2 = (OAuth2Authentication) auth;
-            if (!(oauth2.getUserAuthentication() instanceof UsernamePasswordAuthenticationToken)) {
-                return null;
-            }
-
-            final UsernamePasswordAuthenticationToken userToken = (UsernamePasswordAuthenticationToken) oauth2.getUserAuthentication();
-            final Map<String, Object> userDetails = (Map<String, Object>) userToken.getDetails();
-
-            // Extract user details.
-            final String userAvatar = (String) userDetails.get("avatar_url");
-            final String userId = userToken.getName();
-            return new Identity(userId, userAvatar);
-        };
+        final OAuth2AuthenticationToken oauth2 = (OAuth2AuthenticationToken) auth;
+        final OAuth2User user = oauth2.getPrincipal();
+        return new UserIdentity((String) user.getAttributes().get("login"),
+                (String) user.getAttributes().get("avatar_url"));
     }
 
     @Bean
     @Profile("noauth")
-    IdentityProvider dummyIdentityProvider() {
+    UserIdentity dummyIdentityProvider() {
         // Return a default user identity.
-        return () -> new Identity("johndoe", null);
+        return new UserIdentity("johndoe", null);
     }
 }
