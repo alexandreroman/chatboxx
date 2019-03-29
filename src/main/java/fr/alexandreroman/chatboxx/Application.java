@@ -86,7 +86,7 @@ class MessagesController {
     SseEmitter getMessageEvents() {
         // Get message stream using a HTML5 Server-Sent-Event endpoint.
 
-        final SseEmitter emitter = new SseEmitter();
+        final SseEmitter emitter = new SseEmitter(1000 * 60 * 5L);
         emitters.add(emitter);
         emitter.onCompletion(() -> emitters.remove(emitter));
         emitter.onTimeout(() -> emitters.remove(emitter));
