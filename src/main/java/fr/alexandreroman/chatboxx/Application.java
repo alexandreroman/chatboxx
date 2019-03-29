@@ -31,6 +31,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
@@ -44,6 +46,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotEmpty;
 import java.io.IOException;
 import java.time.ZonedDateTime;
@@ -103,6 +106,7 @@ class MessagesController {
     }
 
     @PostMapping("/api/messages")
+    @PreAuthorize("isAuthenticated()")
     ResponseEntity<?> newMessage(@RequestParam("message") @NotEmpty String newMsg) {
         final String author = user.getUser();
         final String avatar = user.getAvatar();
@@ -149,10 +153,8 @@ class IdentityController {
     private final UserIdentity user;
 
     @GetMapping("/api/me")
+    @PreAuthorize("isAuthenticated()")
     ResponseEntity<?> me() {
-        if (user.isAnonymous()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You're not authenticated");
-        }
         final Map<String, String> result = new HashMap<>(2);
         result.put("user", user.getUser());
         result.put("avatar", user.getAvatar());
@@ -162,30 +164,23 @@ class IdentityController {
 
 @Data
 class UserIdentity {
-    private static final UserIdentity ANONYMOUS = new UserIdentity("_anonymous_", null);
     private final String user;
     private final String avatar;
-
-    public static UserIdentity anonymous() {
-        return ANONYMOUS;
-    }
-
-    boolean isAnonymous() {
-        return this.equals(ANONYMOUS);
-    }
 }
 
 @EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true, proxyTargetClass = true)
 @Configuration
 class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http.csrf().disable().httpBasic().disable().formLogin().disable()
-                .antMatcher("/**")
+                .exceptionHandling().accessDeniedHandler((req, resp, e) -> resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Access denied"))
+                .and().anonymous()
+                .and().antMatcher("/**")
                 .authorizeRequests()
                 .antMatchers("/actuator**", "/error**", "/login**", "/login/oauth2/**", "/logout",
-                        "/api/me", "/api/messages/sse", "/", "**.js", "**.css", "**.png", "**.ico").permitAll()
-                .anyRequest().authenticated()
+                        "/", "**.js", "**.css", "**.png", "**.ico").permitAll()
                 .and().oauth2Login().loginPage("/login")
                 .and().logout().logoutSuccessUrl("/").permitAll();
     }
@@ -195,10 +190,6 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
     UserIdentity identityProvider() {
         final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!(auth instanceof OAuth2AuthenticationToken)) {
-            return UserIdentity.anonymous();
-        }
-
         final OAuth2AuthenticationToken oauth2 = (OAuth2AuthenticationToken) auth;
         final OAuth2User user = oauth2.getPrincipal();
         return new UserIdentity((String) user.getAttributes().get("login"),
