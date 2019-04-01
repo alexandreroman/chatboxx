@@ -1,10 +1,51 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
+    <meta charset="utf-8"/>
     <title>Chatboxx</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui"/>
+    <link rel="icon" type="image/png" href="/icon.png"/>
+    <link href='https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900|Material+Icons'
+          rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/vuetify/dist/vuetify.min.css" rel="stylesheet"/>
 </head>
 <body>
-<h1>Welcome to Chatboxx!</h1>
+
+<div id="app">
+    <v-app>
+        <v-content>
+            <v-container fluid>
+                <v-layout row align-center fill-height>
+                    <v-text-field placeholder="What's on your mind?" autofocus v-model="newMessage"
+                                  v-on:keyup.enter="sendMessage"></v-text-field>
+                    <v-btn small v-on:click="sendMessage">Send</v-btn>
+                </v-layout>
+                <v-list two-line style="max-height: 370px" class="scroll-y" id="messages">
+                    <template v-for="(item, index) in messages">
+                        <v-list-tile :key="item.id" avatar ripple>
+                            <v-list-tile-avatar>
+                                <v-img :src="item.avatar" :alt="item.author"/>
+                            </v-list-tile-avatar>
+                            <v-list-tile-content>
+                                <v-list-tile-title>{{ item.author }}</v-list-tile-title>
+                                <v-list-tile-sub-title>{{ item.message }}</v-list-tile-sub-title>
+                            </v-list-tile-content>
+                            <v-list-tile-action>
+                                <v-list-tile-action-text>{{ item.timeCreated | moment }}</v-list-tile-action-text>
+                            </v-list-tile-action>
+                        </v-list-tile>
+                    </template>
+                </v-list>
+            </v-container>
+        </v-content>
+    </v-app>
+</div>
 </body>
+
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify/dist/vuetify.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.21.1/babel.min.js"></script>
+<script type="text/babel" src="/scripts.js"></script>
 </html>
