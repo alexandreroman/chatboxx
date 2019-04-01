@@ -66,7 +66,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         http.csrf().disable();
         http.httpBasic().disable().formLogin().disable();
-        http.exceptionHandling().accessDeniedHandler((req, resp, e) -> resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Access denied"));
+        http.exceptionHandling().accessDeniedHandler((req, resp, e) -> resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Access denied"))
+                .authenticationEntryPoint((req, resp, e) -> resp.sendError(HttpServletResponse.SC_FORBIDDEN));
         http.anonymous();
         http.antMatcher("/**")
                 .authorizeRequests()
@@ -86,11 +87,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             final OAuth2AuthenticationToken oauth2 = (OAuth2AuthenticationToken) auth;
             final OAuth2User user = oauth2.getPrincipal();
             return new UserIdentity((String) user.getAttributes().get("login"),
+                    (String) user.getAttributes().get("html_url"),
                     (String) user.getAttributes().get("avatar_url"));
         }
         if (auth instanceof JwtAuthenticationToken) {
             final JwtAuthenticationToken jwt = (JwtAuthenticationToken) auth;
-            return new UserIdentity(jwt.getUserId(), jwt.getUserAvatar());
+            return new UserIdentity(jwt.getUserId(), jwt.getUserProfile(), jwt.getUserAvatar());
         }
         throw new IllegalArgumentException("Unsupported authentication: " + auth);
     }
@@ -99,7 +101,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Profile("noauth")
     UserIdentity dummyIdentityProvider() {
         // Return a default user identity.
-        return new UserIdentity("johndoe", null);
+        return new UserIdentity("johndoe", "https://github.com/johndoe", null);
     }
 }
 
@@ -132,11 +134,13 @@ class UserIdentityController {
     ResponseEntity<?> me() {
         final Map<String, String> result = new HashMap<>(2);
         result.put("user", user.getUser());
+        result.put("profile", user.getProfile());
         result.put("avatar", user.getAvatar());
 
         final String jwt = Jwts.builder()
                 .setId(UUID.randomUUID().toString())
                 .setSubject(user.getUser())
+                .claim("profile", user.getProfile())
                 .claim("avatar", user.getAvatar())
                 .setExpiration(new Date(System.currentTimeMillis() + securityProps.getTokenLifetime()))
                 .signWith(Keys.hmacShaKeyFor(securityProps.getTokenSecret().getBytes()), SignatureAlgorithm.HS256)
@@ -144,6 +148,8 @@ class UserIdentityController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.AUTHORIZATION)
+                .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .body(result);
     }
 }
@@ -151,6 +157,7 @@ class UserIdentityController {
 @Data
 class UserIdentity {
     private final String user;
+    private final String profile;
     private final String avatar;
 }
 
@@ -173,10 +180,11 @@ class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
                     .setSigningKey(Keys.hmacShaKeyFor(securityProps.getTokenSecret().getBytes()))
                     .parseClaimsJws(jwt).getBody();
             final String userId = jwtClaims.getSubject();
+            final String userProfile = jwtClaims.get("profile", String.class);
             final String userAvatar = jwtClaims.get("avatar", String.class);
 
             SecurityContextHolder.getContext()
-                    .setAuthentication(new JwtAuthenticationToken(userId, userAvatar));
+                    .setAuthentication(new JwtAuthenticationToken(userId, userProfile, userAvatar));
         }
 
         chain.doFilter(req, resp);
@@ -185,9 +193,11 @@ class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
 
 class JwtAuthenticationToken extends UsernamePasswordAuthenticationToken {
     private final String userAvatar;
+    private final String userProfile;
 
-    JwtAuthenticationToken(final String userId, final String userAvatar) {
+    JwtAuthenticationToken(final String userId, final String userProfile, final String userAvatar) {
         super(userId, null, Collections.emptyList());
+        this.userProfile = userProfile;
         this.userAvatar = userAvatar;
     }
 
@@ -197,6 +207,10 @@ class JwtAuthenticationToken extends UsernamePasswordAuthenticationToken {
 
     public String getUserAvatar() {
         return userAvatar;
+    }
+
+    public String getUserProfile() {
+        return userProfile;
     }
 
     @Override

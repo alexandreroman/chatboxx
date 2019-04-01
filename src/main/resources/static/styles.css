@@ -1,0 +1,43 @@
+.copyright {
+    padding: 1em;
+}
+
+.copyright, .copyright a {
+    color: #888;
+}
+
+.author, .timeCreated {
+    font-size: 1em;
+}
+
+.author {
+    font-weight: bold;
+}
+
+.v-btn {
+    margin: 0 0 0 8px;
+}
+
+#messages, #noMessages {
+    height: 370px;
+}
+
+#noMessages span {
+    margin: 1em;
+    color: #888;
+}
+
+h1 {
+    font-family: 'Yanone Kaffeesatz', sans-serif;
+    font-size: 300%;
+    margin: 6px 10px;
+}
+
+.v-content {
+    background: #EEE;
+}
+
+#messages {
+    border-radius: 6px;
+    -moz-border-radius: 6px;
+}

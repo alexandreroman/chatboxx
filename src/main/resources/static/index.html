@@ -7,37 +7,54 @@
     <link rel="icon" type="image/png" href="/icon.png"/>
     <link href='https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900|Material+Icons'
           rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/vuetify/dist/vuetify.min.css" rel="stylesheet"/>
+    <link href="/styles.css" rel="stylesheet"/>
 </head>
 <body>
-
 <div id="app">
     <v-app>
         <v-content>
             <v-container fluid>
-                <v-layout row align-center fill-height>
-                    <v-text-field placeholder="What's on your mind?" autofocus v-model="newMessage"
-                                  v-on:keyup.enter="sendMessage"></v-text-field>
-                    <v-btn small v-on:click="sendMessage">Send</v-btn>
+                <v-layout row align-center>
+                    <img src="/icon.png" width="36" height="36"/>
+                    <h1>Chatboxx</h1>
                 </v-layout>
-                <v-list two-line style="max-height: 370px" class="scroll-y" id="messages">
+                <v-list two-line dense class="scroll-y" v-show="messages.length != 0" id="messages">
                     <template v-for="(item, index) in messages">
-                        <v-list-tile :key="item.id" avatar ripple>
+                        <v-list-tile :key="item.id">
                             <v-list-tile-avatar>
                                 <v-img :src="item.avatar" :alt="item.author"/>
                             </v-list-tile-avatar>
                             <v-list-tile-content>
-                                <v-list-tile-title>{{ item.author }}</v-list-tile-title>
+                                <v-list-tile-title class="author">{{ item.author }}</v-list-tile-title>
                                 <v-list-tile-sub-title>{{ item.message }}</v-list-tile-sub-title>
                             </v-list-tile-content>
-                            <v-list-tile-action>
-                                <v-list-tile-action-text>{{ item.timeCreated | moment }}</v-list-tile-action-text>
+                            <v-list-tile-action align-end>
+                                <v-list-tile-action-text :key="item.refreshTag" class="timeCreated">
+                                    {{ item.timeCreated | moment }}
+                                </v-list-tile-action-text>
                             </v-list-tile-action>
                         </v-list-tile>
                     </template>
                 </v-list>
+                <v-layout column align-center justify-center v-show="messages.length == 0" id="noMessages">
+                    <img src="/sad.png" width="64" height="64"/>
+                    <span>No message yet</span>
+                </v-layout>
+                <v-layout align-center row fill-height>
+                    <v-text-field placeholder="What's on your mind?" autofocus v-model="newMessage"
+                                  v-on:keyup.enter="sendMessage"></v-text-field>
+                    <v-btn small round v-on:click="sendMessage" :color="sendColor" justify-end>Send</v-btn>
+                </v-layout>
             </v-container>
         </v-content>
+        <v-footer app right>
+            <v-layout row>
+                <span class="copyright" justify-end>Copyright &copy; 2019 <a
+                        href="https://pivotal.io">Pivotal Software Inc.</a></span>
+            </v-layout>
+        </v-footer>
     </v-app>
 </div>
 </body>
