@@ -15,5 +15,5 @@ ARG DEPENDENCY=/workspace/app/target/dependency
 COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
 COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
 COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
-ENTRYPOINT ["java","-XX:+UnlockExperimentalVMOptions","-XX:+UseCGroupMemoryLimitForHeap","-cp","app:app/lib/*","fr.alexandreroman.chatboxx.Application"]
+ENTRYPOINT ["java","-noverify","-XX:TieredStopAtLevel=1","-Djava.security.egd=file:/dev/./urandom","-XX:+AlwaysPreTouch","-XX:+UnlockExperimentalVMOptions","-XX:+UseCGroupMemoryLimitForHeap","-cp","app:app/lib/*","fr.alexandreroman.chatboxx.Application"]
 EXPOSE 8080
