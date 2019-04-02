@@ -7,18 +7,6 @@ var app = new Vue({
         sendColor: null
     },
     methods: {
-        init: function () {
-            var evtSource = new EventSource("/api/messages/sse");
-            var that = this;
-            evtSource.addEventListener("message", function (e) {
-                var msg = JSON.parse(e.data);
-                msg.refreshTag = new Date().getTime();
-                that.messages.push(msg);
-            }, false);
-            evtSource.addEventListener("close", function (e) {
-                evtSource.close();
-            }, false);
-        },
         scrollToEnd: function () {
             var container = document.getElementById("messages");
             var scrollHeight = container.scrollHeight;
@@ -54,7 +42,7 @@ var app = new Vue({
                 sessionStorage.removeItem("authToken");
             });
         },
-        refresh: function () {
+        refreshUI: function () {
             var tag = new Date().getTime();
             for (var i = 0; i < this.messages.length; ++i) {
                 this.messages[i].refreshTag = tag;
@@ -70,11 +58,9 @@ var app = new Vue({
         }
     },
     created() {
-        this.init();
-
         var that = this;
         setInterval(function () {
-            that.refresh();
+            that.refreshUI();
         }.bind(this), 60000);
     },
     updated() {
@@ -87,5 +73,73 @@ var app = new Vue({
         if (this.authToken == null) {
             this.fetchAuthToken();
         }
+
+        var that = this;
+        var handler = function (e) {
+            var msg = JSON.parse(e.data);
+            msg.refreshTag = new Date().getTime();
+            that.messages.push(msg);
+        };
+        setupEventSource(handler);
     }
 });
+
+
+// This snippet comes from this page:
+// https://stackoverflow.com/a/54385402/422906
+
+function isFunction(functionToCheck) {
+    return functionToCheck && {}.toString.call(functionToCheck) === '[object Function]';
+}
+
+function debounce(func, wait) {
+    var timeout;
+    var waitFunc;
+
+    return function () {
+        if (isFunction(wait)) {
+            waitFunc = wait;
+        } else {
+            waitFunc = function () {
+                return wait
+            };
+        }
+
+        var context = this, args = arguments;
+        var later = function () {
+            timeout = null;
+            func.apply(context, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, waitFunc());
+    };
+}
+
+// reconnectFrequencySeconds doubles every retry
+var reconnectFrequencySeconds = 1;
+var evtSource;
+
+var reconnectFunc = debounce(function () {
+    setupEventSource();
+    // Double every attempt to avoid overwhelming server
+    reconnectFrequencySeconds *= 2;
+    // Max out at ~1 minute as a compromise between user experience and server load
+    if (reconnectFrequencySeconds >= 64) {
+        reconnectFrequencySeconds = 64;
+    }
+}, function () {
+    return reconnectFrequencySeconds * 1000
+});
+
+function setupEventSource(handler) {
+    evtSource = new EventSource("/api/messages/sse");
+    evtSource.onmessage = handler;
+    evtSource.onopen = function (e) {
+        // Reset reconnect frequency upon successful connection
+        reconnectFrequencySeconds = 1;
+    };
+    evtSource.onerror = function (e) {
+        evtSource.close();
+        reconnectFunc();
+    };
+}
