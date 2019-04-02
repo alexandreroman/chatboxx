@@ -37,8 +37,8 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -74,8 +74,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/actuator**", "/error**", "/login**", "/login/oauth2/**", "/logout",
                         "/", "**.js", "**.css", "**.png", "**.ico").permitAll();
         http.oauth2Login().loginPage("/login")
-                .and().logout().logoutSuccessUrl("/").permitAll();
-        http.addFilterBefore(new JwtAuthenticationTokenFilter(securityProps), SecurityContextHolderAwareRequestFilter.class);
+                .and().logout().deleteCookies("JSESSIONID").logoutSuccessUrl("/").permitAll();
+        http.addFilterBefore(new JwtAuthenticationTokenFilter(securityProps), OAuth2AuthorizationRequestRedirectFilter.class);
     }
 
     @Bean

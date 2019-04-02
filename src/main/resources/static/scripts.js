@@ -33,9 +33,21 @@ var app = new Vue({
                 axios.get("/api/me").then(function (resp) {
                     that.authToken = resp.headers["authorization"];
                     axios.defaults.headers.common["Authorization"] = that.authToken;
+                    sessionStorage.setItem("authToken", that.authToken);
                     that._doSendMessage();
+                }).catch(function (e) {
+                    that.authToken = null;
+                    sessionStorage.removeItem("authToken");
+                    axios.defaults.headers.common["Authorization"] = null;
+                    that.sendColor = "error";
+                    if (e.response) {
+                        if (e.response.status === 403) {
+                            document.location = "/login";
+                        }
+                    }
                 });
             } else {
+                axios.defaults.headers.common["Authorization"] = this.authToken;
                 this._doSendMessage();
             }
         },
@@ -73,5 +85,9 @@ var app = new Vue({
     },
     updated() {
         this.scrollToEnd();
+    },
+    mounted() {
+        this.authToken = sessionStorage.getItem("authToken");
+        axios.defaults.headers.common["Authorization"] = this.authToken;
     }
 });
