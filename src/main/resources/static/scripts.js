@@ -73,14 +73,7 @@ var app = new Vue({
         if (this.authToken == null) {
             this.fetchAuthToken();
         }
-
-        var that = this;
-        var handler = function (e) {
-            var msg = JSON.parse(e.data);
-            msg.refreshTag = new Date().getTime();
-            that.messages.push(msg);
-        };
-        setupEventSource(handler);
+        setupEventSource();
     }
 });
 
@@ -131,9 +124,13 @@ var reconnectFunc = debounce(function () {
     return reconnectFrequencySeconds * 1000
 });
 
-function setupEventSource(handler) {
+function setupEventSource() {
     evtSource = new EventSource("/api/messages/sse");
-    evtSource.onmessage = handler;
+    evtSource.onmessage = function (e) {
+        var msg = JSON.parse(e.data);
+        msg.refreshTag = new Date().getTime();
+        app.messages.push(msg);
+    };
     evtSource.onopen = function (e) {
         // Reset reconnect frequency upon successful connection
         reconnectFrequencySeconds = 1;
