@@ -37,6 +37,10 @@ h1 {
     background: #EEE;
 }
 
+#containerContent {
+    max-width: 600px;
+}
+
 #messages {
     border-radius: 6px;
     -moz-border-radius: 6px;
