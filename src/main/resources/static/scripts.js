@@ -29,29 +29,8 @@ var app = new Vue({
                 return;
             }
             if (this.authToken == null) {
-                var that = this;
-                axios.get("/api/me").then(function (resp) {
-                    that.authToken = resp.headers["authorization"];
-                    axios.defaults.headers.common["Authorization"] = that.authToken;
-                    sessionStorage.setItem("authToken", that.authToken);
-                    that._doSendMessage();
-                }).catch(function (e) {
-                    that.authToken = null;
-                    sessionStorage.removeItem("authToken");
-                    axios.defaults.headers.common["Authorization"] = null;
-                    that.sendColor = "error";
-                    if (e.response) {
-                        if (e.response.status === 403) {
-                            document.location = "/login";
-                        }
-                    }
-                });
-            } else {
-                axios.defaults.headers.common["Authorization"] = this.authToken;
-                this._doSendMessage();
+                return;
             }
-        },
-        _doSendMessage: function () {
             var that = this;
             var formData = new FormData();
             formData.append("message", that.newMessage);
@@ -63,11 +42,26 @@ var app = new Vue({
                 that.sendColor = "error";
             });
         },
+        fetchAuthToken: function () {
+            var that = this;
+            axios.get("/api/me").then(function (resp) {
+                that.authToken = resp.headers["authorization"];
+                axios.defaults.headers.common["Authorization"] = that.authToken;
+                sessionStorage.setItem("authToken", that.authToken);
+            }).catch(function () {
+                that.authToken = null;
+                axios.defaults.headers.common["Authorization"] = null;
+                sessionStorage.removeItem("authToken");
+            });
+        },
         refresh: function () {
             var tag = new Date().getTime();
             for (var i = 0; i < this.messages.length; ++i) {
                 this.messages[i].refreshTag = tag;
             }
+        },
+        login: function () {
+            window.location.href = "/login";
         }
     },
     filters: {
@@ -89,5 +83,9 @@ var app = new Vue({
     mounted() {
         this.authToken = sessionStorage.getItem("authToken");
         axios.defaults.headers.common["Authorization"] = this.authToken;
+
+        if (this.authToken == null) {
+            this.fetchAuthToken();
+        }
     }
 });
