@@ -50,6 +50,17 @@ var app = new Vue({
         },
         login: function () {
             window.location.href = "/login";
+        },
+        addMessage: function (msg) {
+            msg.refreshTag = new Date().getTime();
+
+            // Limit how many messages are displayed in the browser,
+            // to reduce memory usage.
+            var maxMessages = 50;
+            if (this.messages.length > maxMessages) {
+                this.messages = this.messages.slice(this.messages.length - maxMessages);
+            }
+            this.messages.push(msg);
         }
     },
     filters: {
@@ -128,8 +139,7 @@ function setupEventSource() {
     evtSource = new EventSource("/api/messages/sse");
     evtSource.onmessage = function (e) {
         var msg = JSON.parse(e.data);
-        msg.refreshTag = new Date().getTime();
-        app.messages.push(msg);
+        app.addMessage(msg);
     };
     evtSource.onopen = function (e) {
         // Reset reconnect frequency upon successful connection
