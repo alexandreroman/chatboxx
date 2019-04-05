@@ -14,7 +14,10 @@ data:
 
 # You need to set Google credentials in order to use GCP services.
 
-# Create a GCP service account:
+# Enable Google Pub/Sub on your GCP account:
+# $ gcloud services enable pubsub.googleapis.com
+
+# Create a GCP service account for Pub/Sub:
 # $ gcloud iam service-accounts create chatboxx --display-name "Chatboxx"
 # $ export PROJECT_ID=$(gcloud config get-value project)
 # $ gcloud projects add-iam-policy-binding ${PROJECT_ID} --member "serviceAccount:chatboxx@${PROJECT_ID}.iam.gserviceaccount.com" --role "roles/pubsub.editor"
