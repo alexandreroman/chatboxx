@@ -1,3 +1,10 @@
+# Dockerfile sample:
+# you better use "Cloud Native Buildpacks" to create a secure Docker image.
+#
+# Go to buildpacks.io and install pack CLI.
+# Then run this command to build a Docker image:
+#  $ pack build myuser/myimage --publish
+
 FROM adoptopenjdk/openjdk8 as build
 WORKDIR /workspace/app
 
