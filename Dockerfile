@@ -5,7 +5,7 @@
 # Then run this command to build a Docker image:
 #  $ pack build myuser/myimage --publish
 
-FROM adoptopenjdk/openjdk8 as build
+FROM adoptopenjdk:8-jdk-hotspot as build
 WORKDIR /workspace/app
 
 COPY mvnw .
@@ -16,7 +16,7 @@ COPY src src
 RUN ./mvnw -B package -DskipTests
 RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 
-FROM adoptopenjdk/openjdk8:jre
+FROM adoptopenjdk:8-jre-hotspot
 VOLUME /tmp
 ARG DEPENDENCY=/workspace/app/target/dependency
 COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
